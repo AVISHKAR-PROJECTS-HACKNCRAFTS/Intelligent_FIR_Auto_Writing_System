@@ -21,7 +21,7 @@ export interface RealtimeAnalysis {
   preview: {
     persons: string[];
     locations: string[];
-    dates: string[];
+    organizations: string[];
   };
 }
 
@@ -48,13 +48,10 @@ export interface FIRResponse {
   fir_text: string;
   processing_time_seconds: number;
   generated_at: string;
-  severity_score: number;
-  severity_level: string;
-  severity_factors: string[];
   witness_name?: string;
   witness_contact?: string;
   error?: string;
 }
 
 export type ApiStatus = "checking" | "online" | "offline";
-export type TabType = "fir" | "entities" | "legal" | "severity";
+export type TabType = "fir" | "entities" | "legal";

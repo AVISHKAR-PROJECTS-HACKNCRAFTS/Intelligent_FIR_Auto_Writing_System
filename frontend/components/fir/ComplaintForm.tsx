@@ -21,7 +21,6 @@ interface ComplaintFormProps {
   showWitness: boolean;
   setShowWitness: (value: boolean) => void;
   realtimeAnalysis: RealtimeAnalysis | null;
-  suggestions: string[];
   loading: boolean;
   apiStatus: "checking" | "online" | "offline";
   onSubmit: (e: React.FormEvent) => void;
@@ -42,7 +41,6 @@ export function ComplaintForm({
   showWitness,
   setShowWitness,
   realtimeAnalysis,
-  suggestions,
   loading,
   apiStatus,
   onSubmit,
@@ -156,42 +154,15 @@ export function ComplaintForm({
                   📍 {l}
                 </span>
               ))}
-              {realtimeAnalysis.preview.dates.map((d, i) => (
+              {realtimeAnalysis.preview.organizations && realtimeAnalysis.preview.organizations.map((o, i) => (
                 <span
-                  key={`d-${i}`}
+                  key={`o-${i}`}
                   className="px-2.5 py-1 bg-chart-3/15 text-chart-3 text-xs rounded-lg border border-chart-3/20 font-medium"
                 >
-                  📅 {d}
+                  🏢 {o}
                 </span>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Suggestions */}
-        {suggestions.length > 0 && (
-          <div className="p-4 bg-gradient-to-br from-chart-4/5 to-chart-5/5 rounded-xl border border-chart-4/10">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-md bg-chart-4/10 flex items-center justify-center">
-                <span className="text-xs">💡</span>
-              </div>
-              <p className="text-xs font-semibold text-chart-4 uppercase tracking-wide">
-                Suggested Details
-              </p>
-            </div>
-            <ul className="text-sm text-foreground space-y-2">
-              {suggestions.map((s, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 p-2 bg-background/50 rounded-lg border border-border/50"
-                >
-                  <span className="w-5 h-5 rounded-full bg-chart-4/10 text-chart-4 text-xs flex items-center justify-center shrink-0 font-medium">
-                    {i + 1}
-                  </span>
-                  <span className="text-muted-foreground">{s}</span>
-                </li>
-              ))}
-            </ul>
           </div>
         )}
 

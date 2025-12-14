@@ -1,7 +1,7 @@
 "use client";
 
 import { FIRResponse } from "./types";
-import { getConfidenceColor, getSeverityColor, getOffenceIcon } from "./utils";
+import { getConfidenceColor, getOffenceIcon } from "./utils";
 
 interface ResultSummaryProps {
   result: FIRResponse;
@@ -22,13 +22,6 @@ export function ResultSummary({ result }: ResultSummaryProps) {
             </p>
           </div>
         </div>
-        <span
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getSeverityColor(
-            result.severity_level
-          )}`}
-        >
-          {result.severity_level}
-        </span>
       </div>
 
       {/* Offence Classification */}

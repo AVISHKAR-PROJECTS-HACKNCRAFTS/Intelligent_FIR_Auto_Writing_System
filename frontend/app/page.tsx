@@ -34,7 +34,6 @@ export default function Home() {
 
   // Analysis state
   const [realtimeAnalysis, setRealtimeAnalysis] = useState<RealtimeAnalysis | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
 
   // Refs
@@ -59,32 +58,20 @@ export default function Home() {
   const analyzeRealtime = useCallback(async (text: string) => {
     if (text.length < 20) {
       setRealtimeAnalysis(null);
-      setSuggestions([]);
       return;
     }
 
     try {
-      const [analysisRes, suggestionsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/analyze_realtime`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        }),
-        fetch(`${API_BASE_URL}/suggest_questions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        }),
-      ]);
+      const analysisRes = await fetch(`${API_BASE_URL}/analyze_realtime`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
 
       const analysisData = await analysisRes.json();
-      const suggestionsData = await suggestionsRes.json();
 
       if (analysisData.success) {
         setRealtimeAnalysis(analysisData);
-      }
-      if (suggestionsData.success) {
-        setSuggestions(suggestionsData.suggestions || []);
       }
     } catch {
       // Silent fail for real-time analysis
@@ -194,7 +181,6 @@ export default function Home() {
     setError("");
     setCopied(false);
     setRealtimeAnalysis(null);
-    setSuggestions([]);
     setShowWitness(false);
   };
 
@@ -217,7 +203,6 @@ export default function Home() {
           showWitness={showWitness}
           setShowWitness={setShowWitness}
           realtimeAnalysis={realtimeAnalysis}
-          suggestions={suggestions}
           loading={loading}
           apiStatus={apiStatus}
           onSubmit={handleSubmit}
