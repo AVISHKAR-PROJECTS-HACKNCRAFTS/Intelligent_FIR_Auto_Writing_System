@@ -4,6 +4,8 @@ Includes text preprocessing, IPC section mapping, and FIR document generation.
 """
 
 import re
+import os
+import tempfile
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -109,16 +111,20 @@ def get_ipc_sections(offence_type: str) -> List[Dict[str, str]]:
     return IPC_SECTIONS.get(offence_type, IPC_SECTIONS["Other"])
 
 
-def generate_fir_document(data: Dict[str, Any]) -> str:
+def generate_fir_document(data: Dict[str, Any], language: str = 'en') -> str:
     """
     Generate formatted FIR document from extracted data.
     
     Args:
         data: Dictionary containing all FIR fields
+        language: Language for FIR document ('en' or 'te')
         
     Returns:
         Formatted FIR text document
     """
+    if language == 'te':
+        return generate_fir_document_telugu(data)
+    
     # Get IPC sections
     ipc_sections = data.get('ipc_sections', [])
     ipc_text = "\n".join([f"  - Section {s['section']}: {s['description']}" for s in ipc_sections])
@@ -213,5 +219,177 @@ Officer Rank/Badge:   ________________________
 ================================================================================
 """
     return fir_template
+
+
+def generate_fir_document_telugu(data: Dict[str, Any]) -> str:
+    """
+    Generate formatted FIR document in Telugu language.
+    
+    Args:
+        data: Dictionary containing all FIR fields
+        
+    Returns:
+        Formatted FIR text document in Telugu
+    """
+    # Get IPC sections
+    ipc_sections = data.get('ipc_sections', [])
+    ipc_text = "\n".join([f"  - సెక్షన్ {s['section']}: {s['description']}" for s in ipc_sections])
+    
+    # Format extracted persons (from NER model)
+    persons = data.get('extracted_persons', [])
+    persons_text = ", ".join(persons) if persons else "గుర్తించబడలేదు"
+    
+    # Format extracted locations (from NER model)
+    locations = data.get('extracted_entities', {}).get('locations', [])
+    locations_text = ", ".join(locations) if locations else "పేర్కొనబడలేదు"
+    
+    # Format extracted organizations (from NER model)
+    organizations = data.get('extracted_entities', {}).get('organizations', [])
+    organizations_text = ", ".join(organizations) if organizations else "ఏదీ లేదు"
+    
+    # Witness info
+    witness_name = data.get('witness_name', '')
+    witness_contact = data.get('witness_contact', '')
+    witness_text = f"{witness_name} ({witness_contact})" if witness_name else "అందించబడలేదు"
+    
+    # FIR ID
+    fir_id = data.get('fir_id', 'పెండింగ్')
+    
+    # Offence type translations
+    offence_translations = {
+        "Theft": "దొంగతనం",
+        "Assault": "దాడి",
+        "Cyber Crime": "సైబర్ నేరం",
+        "Cheating": "మోసం",
+        "Fraud": "మోసపూరిత",
+        "Harassment": "వేధింపు",
+        "Other": "ఇతర"
+    }
+    offence_type_te = offence_translations.get(data.get('offence_type', 'Unknown'), data.get('offence_type', 'తెలియదు'))
+    
+    fir_template = f"""
+================================================================================
+                    మొదటి సమాచార నివేదిక (ఎఫ్‌ఐఆర్)
+================================================================================
+ఎఫ్‌ఐఆర్ సూచన: {fir_id}
+సృష్టించిన తేదీ: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
+================================================================================
+
+విభాగం A: ఫిర్యాదుదారు వివరాలు
+--------------------------------
+పేరు:    {data.get('name', 'N/A')}
+సంప్రదింపు: {data.get('contact', 'N/A')}
+
+విభాగం B: సాక్షి వివరాలు
+---------------------------
+{witness_text}
+
+విభాగం C: సంఘటన వివరాలు
+---------------------------
+సంఘటన స్థలం: {locations_text}
+నేర రకం:   {offence_type_te}
+వర్గీకరణ విశ్వసనీయత: {data.get('confidence', 0):.1%}
+
+విభాగం D: పాల్గొన్న వ్యక్తులు / నిందితులు
+--------------------------------------------
+{persons_text}
+
+విభాగం E: సేకరించిన సమాచారం (ML మోడల్స్)
+--------------------------------------------
+స్థలాలు:       {locations_text}
+సంస్థలు:   {organizations_text}
+
+విభాగం F: వర్తించే చట్టపరమైన విభాగాలు
+-----------------------------------------
+{ipc_text if ipc_text else "  దర్యాప్తు అధికారిచే నిర్ణయించబడుతుంది"}
+
+విభాగం G: వివరణాత్మక వర్ణన
+-------------------------------
+{data.get('description', 'వివరణ అందించబడలేదు')}
+
+విభాగం H: ఫిర్యాదుదారు అభ్యర్థన
+------------------------------------
+నేను, {data.get('name', 'ఫిర్యాదుదారు')}, సంబంధిత అధికారులను దయతో ఈ మొదటి 
+సమాచార నివేదికను నమోదు చేయమని మరియు భారతీయ శిక్షాస్మృతి మరియు ఇతర సంబంధిత 
+చట్టాల వర్తించే విభాగాల క్రింద నిందితుల పై అవసరమైన చట్టపరమైన చర్య తీసుకోవాలని 
+అభ్యర్థిస్తున్నాను.
+
+పైన అందించిన సమాచారం నా జ్ఞానం మరియు విశ్వాసం ప్రకారం నిజమైనది మరియు 
+సరైనదని నేను ధృవీకరిస్తున్నాను.
+
+
+ఫిర్యాదుదారు సంతకం: _______________________
+
+తేదీ: _______________________
+
+================================================================================
+                        అధికారిక ఉపయోగం కోసం మాత్రమే
+================================================================================
+ఎఫ్‌ఐఆర్ నంబర్:           ________________________
+పోలీస్ స్టేషన్:       ________________________
+జిల్లా:             ________________________
+నమోదు తేదీ: ________________________
+నమోదు సమయం: ________________________
+దర్యాప్తు అధికారి: ________________________
+అధికారి హోదా/బ్యాడ్జ్:   ________________________
+================================================================================
+                    మొదటి సమాచార నివేదిక ముగింపు
+================================================================================
+"""
+    return fir_template
+
+
+def transcribe_audio(audio_file_path: str) -> str:
+    """
+    Transcribe audio file to text using speech recognition.
+    
+    Args:
+        audio_file_path: Path to the audio file
+        
+    Returns:
+        Transcribed text from the audio
+    """
+    import speech_recognition as sr
+    from pydub import AudioSegment
+    
+    recognizer = sr.Recognizer()
+    
+    try:
+        # Convert audio to WAV format if needed
+        audio = AudioSegment.from_file(audio_file_path)
+        
+        # Create a temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
+            audio.export(temp_wav.name, format="wav")
+            temp_wav_path = temp_wav.name
+        
+        # Transcribe the audio
+        with sr.AudioFile(temp_wav_path) as source:
+            audio_data = recognizer.record(source)
+            
+            # Try Google Speech Recognition first
+            try:
+                text = recognizer.recognize_google(audio_data)
+                return text
+            except sr.UnknownValueError:
+                return "Audio could not be understood"
+            except sr.RequestError as e:
+                # Fallback to Sphinx if Google API fails
+                try:
+                    text = recognizer.recognize_sphinx(audio_data)
+                    return text
+                except:
+                    return f"Speech recognition service error: {str(e)}"
+    
+    except Exception as e:
+        return f"Error processing audio: {str(e)}"
+    
+    finally:
+        # Clean up temporary file
+        if 'temp_wav_path' in locals():
+            try:
+                os.unlink(temp_wav_path)
+            except:
+                pass
 
 

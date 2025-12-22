@@ -15,8 +15,11 @@ import {
   ApiStatus,
   API_BASE_URL,
 } from "@/components/fir";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Home() {
+  const { language } = useLanguage();
+  
   // Form state
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -53,6 +56,50 @@ export default function Home() {
     };
     checkHealth();
   }, []);
+
+  // Regenerate FIR when language changes
+  useEffect(() => {
+    const regenerateFIR = async () => {
+      // Only regenerate if we have a result and required form data
+      if (!result || !name || !description || loading) {
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/generate_fir`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            contact,
+            description,
+            witness_name: witnessName,
+            witness_contact: witnessContact,
+            language: language,
+          }),
+        });
+
+        const data: FIRResponse = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Failed to generate FIR");
+        }
+
+        setResult(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "An error occurred while regenerating FIR."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    regenerateFIR();
+  }, [language]); // Regenerate when language changes
 
   // Real-time analysis with debounce
   const analyzeRealtime = useCallback(async (text: string) => {
@@ -92,6 +139,20 @@ export default function Home() {
     }, 500);
   };
 
+  // Handle audio transcription
+  const handleAudioTranscribed = (text: string) => {
+    setDescription(text);
+    
+    // Trigger real-time analysis
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    debounceRef.current = setTimeout(() => {
+      analyzeRealtime(text);
+    }, 500);
+  };
+
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +171,7 @@ export default function Home() {
           description,
           witness_name: witnessName,
           witness_contact: witnessContact,
+          language: language, // Send current language
         }),
       });
 
@@ -207,6 +269,7 @@ export default function Home() {
           apiStatus={apiStatus}
           onSubmit={handleSubmit}
           onClear={handleClearForm}
+          onAudioTranscribed={handleAudioTranscribed}
         />
 
         {error && <ErrorMessage error={error} />}

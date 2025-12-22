@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { Mic, MicOff, Upload } from "lucide-react";
+import { useState, useRef } from "react";
 
 interface ComplaintFormProps {
   name: string;
@@ -25,6 +28,7 @@ interface ComplaintFormProps {
   apiStatus: "checking" | "online" | "offline";
   onSubmit: (e: React.FormEvent) => void;
   onClear: () => void;
+  onAudioTranscribed?: (text: string) => void;
 }
 
 export function ComplaintForm({
@@ -45,14 +49,95 @@ export function ComplaintForm({
   apiStatus,
   onSubmit,
   onClear,
+  onAudioTranscribed,
 }: ComplaintFormProps) {
+  const { t } = useLanguage();
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      alert("Unable to access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setAudioLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      const response = await fetch("http://127.0.0.1:5000/transcribe_audio", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.text) {
+        const currentText = description;
+        const newText = currentText ? `${currentText}\n${data.text}` : data.text;
+        
+        if (onAudioTranscribed) {
+          onAudioTranscribed(newText);
+        }
+      } else {
+        alert("Failed to transcribe audio: " + (data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      alert("Error transcribing audio. Please try again.");
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    await transcribeAudio(file);
+    event.target.value = "";
+  };
+  
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow p-6 mb-6">
       <div className="flex items-center gap-2 mb-5 pb-4 border-b border-border">
         <div className="w-6 h-6 rounded-md bg-chart-1/10 flex items-center justify-center">
           <span className="text-chart-1 text-xs">📝</span>
         </div>
-        <h2 className="text-sm font-medium text-foreground">Complaint Details</h2>
+        <h2 className="text-sm font-medium text-foreground">{t("form.title")}</h2>
       </div>
       <form onSubmit={onSubmit} className="space-y-5">
         {/* Name and Contact */}
@@ -60,12 +145,12 @@ export function ComplaintForm({
           <div className="space-y-2">
             <Label htmlFor="name" className="text-foreground flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-chart-1"></span>
-              Complainant Name
+              {t("form.name")}
             </Label>
             <Input
               id="name"
               type="text"
-              placeholder="Enter full name"
+              placeholder={t("form.namePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -75,12 +160,12 @@ export function ComplaintForm({
           <div className="space-y-2">
             <Label htmlFor="contact" className="text-foreground flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-chart-2"></span>
-              Contact Number
+              {t("form.contact")}
             </Label>
             <Input
               id="contact"
               type="tel"
-              placeholder="Enter phone number"
+              placeholder={t("form.contactPlaceholder")}
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               required
@@ -93,23 +178,78 @@ export function ComplaintForm({
         <div className="space-y-2">
           <Label htmlFor="description" className="text-foreground flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-chart-3"></span>
-            Complaint Description
+            {t("form.description")}
           </Label>
           <Textarea
             id="description"
-            placeholder="Describe the incident in detail. Include:&#10;• Date and time of incident&#10;• Location where it occurred&#10;• Names of people involved&#10;• What happened step by step&#10;• Any witnesses or evidence"
+            placeholder={t("form.descriptionPlaceholder")}
             value={description}
             onChange={onDescriptionChange}
             required
             rows={8}
             className="resize-none focus-visible:ring-chart-3"
           />
+          
+          {/* Audio Controls */}
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={audioLoading || loading}
+              className={`flex items-center gap-2 ${
+                isRecording
+                  ? "bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20"
+                  : ""
+              }`}
+            >
+              {isRecording ? (
+                <>
+                  <MicOff className="w-4 h-4" />
+                  <span>Stop Recording</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4" />
+                  <span>Record Audio</span>
+                </>
+              )}
+            </Button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={audioLoading || loading}
+              className="flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload Audio</span>
+            </Button>
+
+            {audioLoading && (
+              <span className="text-xs text-muted-foreground flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+                Transcribing...
+              </span>
+            )}
+          </div>
+
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">{description.length} characters</p>
             {description.length > 50 && (
               <span className="text-xs text-chart-2 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-chart-2 animate-pulse"></span>
-                Analyzing...
+                {t("form.analyzing")}
               </span>
             )}
           </div>
@@ -176,7 +316,7 @@ export function ComplaintForm({
             <span className="w-4 h-4 rounded-full bg-chart-5/10 flex items-center justify-center text-xs">
               {showWitness ? "−" : "+"}
             </span>
-            {showWitness ? "Hide witness details" : "Add witness details (optional)"}
+            {showWitness ? t("form.removeWitness") : t("form.addWitness")}
           </button>
         </div>
 
@@ -186,12 +326,12 @@ export function ComplaintForm({
             <div className="space-y-2">
               <Label htmlFor="witnessName" className="text-foreground flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-chart-5"></span>
-                Witness Name
+                {t("form.witnessName")}
               </Label>
               <Input
                 id="witnessName"
                 type="text"
-                placeholder="Enter witness name"
+                placeholder={t("form.witnessNamePlaceholder")}
                 value={witnessName}
                 onChange={(e) => setWitnessName(e.target.value)}
                 className="focus-visible:ring-chart-5"
@@ -200,12 +340,12 @@ export function ComplaintForm({
             <div className="space-y-2">
               <Label htmlFor="witnessContact" className="text-foreground flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-chart-5"></span>
-                Witness Contact
+                {t("form.witnessContact")}
               </Label>
               <Input
                 id="witnessContact"
                 type="tel"
-                placeholder="Enter witness phone"
+                placeholder={t("form.witnessContactPlaceholder")}
                 value={witnessContact}
                 onChange={(e) => setWitnessContact(e.target.value)}
                 className="focus-visible:ring-chart-5"
@@ -224,12 +364,12 @@ export function ComplaintForm({
             {loading ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></span>
-                Analyzing...
+                {t("form.analyzing")}
               </span>
             ) : (
               <span className="flex items-center gap-2">
                 <span>✨</span>
-                Generate FIR
+                {t("form.generateFIR")}
               </span>
             )}
           </Button>
@@ -240,7 +380,7 @@ export function ComplaintForm({
               onClick={onClear}
               className="px-4 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20"
             >
-              Clear
+              {t("form.clear")}
             </Button>
           )}
         </div>

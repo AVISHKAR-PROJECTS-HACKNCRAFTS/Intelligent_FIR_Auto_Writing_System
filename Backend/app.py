@@ -11,8 +11,11 @@ from flask_cors import CORS
 import logging
 import time
 import uuid
+import os
+import tempfile
 from datetime import datetime
 from typing import Dict, Any
+from werkzeug.utils import secure_filename
 
 # Import custom services
 from nlp_service import get_nlp_service
@@ -20,7 +23,8 @@ from classification_service import get_classification_service
 from utils import (
     preprocess_text,
     get_ipc_sections,
-    generate_fir_document
+    generate_fir_document,
+    transcribe_audio
 )
 
 # Configure logging
@@ -108,6 +112,7 @@ def generate_fir_endpoint():
         - name: Complainant name
         - contact: Complainant contact number
         - description: Free text complaint description
+        - language: Language for FIR document ('en' or 'te', default: 'en')
         
     Returns:
         JSON with extracted entities, classification, IPC sections, and FIR text
@@ -128,16 +133,24 @@ def generate_fir_endpoint():
                 "error": "Description field is required and cannot be empty"
             }), 400
         
+        # Get language parameter (default to English)
+        language = json_data.get('language', 'en')
+        if language not in ['en', 'te']:
+            language = 'en'
+        
         start_time = time.time()
         result = process_complaint(json_data)
         processing_time = time.time() - start_time
         
+        # Generate FIR ID first
+        fir_id = f"FIR-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+        
+        # Generate FIR document in requested language with FIR ID
         fir_text = generate_fir_document({
             **result,
-            "extracted_persons": result["extracted_entities"]["persons"]
-        })
-        
-        fir_id = f"FIR-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+            "extracted_persons": result["extracted_entities"]["persons"],
+            "fir_id": fir_id
+        }, language=language)
         
         response = {
             "success": True,
@@ -228,6 +241,70 @@ def extract_entities_endpoint():
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+
+@app.route('/transcribe_audio', methods=['POST'])
+def transcribe_audio_endpoint():
+    """
+    POST endpoint to transcribe audio to text.
+    
+    Expects:
+        - audio file in request.files with key 'audio'
+        
+    Returns:
+        JSON with transcribed text
+    """
+    try:
+        if 'audio' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No audio file provided"
+            }), 400
+        
+        audio_file = request.files['audio']
+        
+        if audio_file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "No audio file selected"
+            }), 400
+        
+        # Save the audio file temporarily
+        filename = secure_filename(audio_file.filename)
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{filename}")
+        
+        try:
+            audio_file.save(temp_path)
+            
+            # Transcribe the audio
+            logger.info(f"Transcribing audio file: {filename}")
+            start_time = time.time()
+            transcribed_text = transcribe_audio(temp_path)
+            processing_time = time.time() - start_time
+            
+            logger.info(f"Audio transcribed in {processing_time:.2f}s")
+            
+            return jsonify({
+                "success": True,
+                "text": transcribed_text,
+                "processing_time_seconds": round(processing_time, 3)
+            }), 200
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception as e:
+                    logger.warning(f"Failed to delete temporary file: {e}")
+    
+    except Exception as e:
+        logger.error(f"Audio transcription error: {str(e)}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": f"Error transcribing audio: {str(e)}"
         }), 500
 
 

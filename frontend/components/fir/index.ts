@@ -14,3 +14,4 @@ export { EntitiesTab } from "./EntitiesTab";
 export { LegalSectionsTab } from "./LegalSectionsTab";
 export { ErrorMessage } from "./ErrorMessage";
 export { Footer } from "./Footer";
+export { LanguageSwitcher } from "./LanguageSwitcher";

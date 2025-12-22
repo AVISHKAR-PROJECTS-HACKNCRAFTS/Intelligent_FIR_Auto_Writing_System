@@ -5,3 +5,7 @@ transformers>=4.30.0
 torch>=2.0.0
 
 numpy>=1.24.0
+
+# Audio processing
+SpeechRecognition>=3.10.0
+pydub>=0.25.1

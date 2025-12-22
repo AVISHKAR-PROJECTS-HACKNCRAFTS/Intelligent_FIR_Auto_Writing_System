@@ -3,6 +3,7 @@
 import { FIRResponse } from "./types";
 import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface FIRDocumentTabProps {
   result: FIRResponse;
@@ -12,6 +13,7 @@ interface FIRDocumentTabProps {
 }
 
 export function FIRDocumentTab({ result, copied, onCopy, onPrint }: FIRDocumentTabProps) {
+  const { t } = useLanguage();
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -75,7 +77,7 @@ export function FIRDocumentTab({ result, copied, onCopy, onPrint }: FIRDocumentT
                 : "hover:bg-chart-1/5 hover:text-chart-1 hover:border-chart-1/20"
             }`}
           >
-            {copied ? "✓ Copied!" : "📋 Copy"}
+            {copied ? `✓ ${t("results.copied")}` : `📋 ${t("results.copyToClipboard")}`}
           </Button>
           <Button
             variant="outline"

@@ -4,6 +4,7 @@ import { FIRResponse, TabType } from "./types";
 import { FIRDocumentTab } from "./FIRDocumentTab";
 import { EntitiesTab } from "./EntitiesTab";
 import { LegalSectionsTab } from "./LegalSectionsTab";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ResultTabsProps {
   result: FIRResponse;
@@ -22,6 +23,8 @@ export function ResultTabs({
   onCopy,
   onPrint,
 }: ResultTabsProps) {
+  const { t } = useLanguage();
+  
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm">
       {/* Tab Headers */}
@@ -35,7 +38,7 @@ export function ResultTabs({
           }`}
         >
           <span className={activeTab === "fir" ? "" : "opacity-60"}>📄</span>
-          FIR Document
+          {t("results.tabs.fir")}
         </button>
         <button
           onClick={() => setActiveTab("entities")}
@@ -46,7 +49,7 @@ export function ResultTabs({
           }`}
         >
           <span className={activeTab === "entities" ? "" : "opacity-60"}>🏷️</span>
-          Extracted
+          {t("results.tabs.entities")}
         </button>
         <button
           onClick={() => setActiveTab("legal")}
@@ -57,7 +60,7 @@ export function ResultTabs({
           }`}
         >
           <span className={activeTab === "legal" ? "" : "opacity-60"}>⚖️</span>
-          Legal
+          {t("results.tabs.legalSections")}
         </button>
       </div>
 
